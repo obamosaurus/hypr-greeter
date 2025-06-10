@@ -22,7 +22,7 @@ use ui::{App, Focus};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Load configuration
-    let mut config = load_config()?;
+     let config = load_config()?;
     
     // Setup terminal
     setup_terminal()?;
