@@ -4,7 +4,6 @@
 use crate::config::Config;
 use chrono::Local;
 use ratatui::{
-    backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -101,7 +100,7 @@ impl App {
 }
 
 /// Main UI drawing function
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App) {
+pub fn draw(f: &mut Frame<'_>, app: &App) {
     let size = f.size();
     
     // Create main layout
@@ -166,7 +165,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App) {
 }
 
 /// Draw title
-fn draw_title<B: Backend>(f: &mut Frame<B>, area: Rect) {
+fn draw_title(f: &mut Frame<'_>, area: Rect) {
     let title = Paragraph::new("Hyprland Greeter")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
@@ -175,7 +174,7 @@ fn draw_title<B: Backend>(f: &mut Frame<B>, area: Rect) {
 }
 
 /// Draw clock and date
-fn draw_clock_date<B: Backend>(f: &mut Frame<B>, area: Rect, config: &Config) {
+fn draw_clock_date(f: &mut Frame<'_>, area: Rect, config: &Config) {
     let now = Local::now();
     let mut text = Vec::new();
     
@@ -200,7 +199,7 @@ fn draw_clock_date<B: Backend>(f: &mut Frame<B>, area: Rect, config: &Config) {
 }
 
 /// Draw username field
-fn draw_username<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
+fn draw_username(f: &mut Frame<'_>, area: Rect, app: &App) {
     let style = get_field_style(app.focus == Focus::Username);
     let username = Paragraph::new(app.username.as_str())
         .style(style)
@@ -212,7 +211,7 @@ fn draw_username<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
 }
 
 /// Draw password field
-fn draw_password<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
+fn draw_password(f: &mut Frame<'_>, area: Rect, app: &App) {
     let style = get_field_style(app.focus == Focus::Password);
     let password_display = if app.config.security.mask_password {
         "*".repeat(app.password.len())
@@ -230,7 +229,7 @@ fn draw_password<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
 }
 
 /// Draw session selector
-fn draw_session<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
+fn draw_session(f: &mut Frame<'_>, area: Rect, app: &App) {
     let style = get_field_style(app.focus == Focus::Session);
     let session_text = if app.focus == Focus::Session {
         format!("< {} >", app.config.sessions[app.selected_session].name)
@@ -249,7 +248,7 @@ fn draw_session<B: Backend>(f: &mut Frame<B>, area: Rect, app: &App) {
 }
 
 /// Draw error message
-fn draw_error<B: Backend>(f: &mut Frame<B>, area: Rect, error: &str) {
+fn draw_error(f: &mut Frame<'_>, area: Rect, error: &str) {
     let error_widget = Paragraph::new(error)
         .style(Style::default().fg(Color::Red))
         .alignment(Alignment::Center)
@@ -258,7 +257,7 @@ fn draw_error<B: Backend>(f: &mut Frame<B>, area: Rect, error: &str) {
 }
 
 /// Draw help text
-fn draw_help<B: Backend>(f: &mut Frame<B>, area: Rect) {
+fn draw_help(f: &mut Frame<'_>, area: Rect) {
     let help_text = "Tab: Next Field | Shift+Tab: Previous Field | ←/→: Change Session | Enter: Login | Esc: Exit";
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))

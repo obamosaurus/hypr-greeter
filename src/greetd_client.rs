@@ -1,12 +1,13 @@
 // ~/hypr-greeter/src/greetd_client.rs
 // greetd IPC client implementation
 
-use greetd_ipc::{AuthMessageType, ErrorType, Request, Response};
+use greetd_ipc::{AuthMessageType, Request, Response};
 use std::error::Error;
 use tokio::net::UnixStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Result type for greetd operations
-pub type GreetdResult<T> = Result<T, Box<dyn Error>>;
+pub type GreetdResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 /// greetd client for authentication
 pub struct GreetdClient {
@@ -17,7 +18,11 @@ pub struct GreetdClient {
 impl GreetdClient {
     /// Connect to greetd daemon
     pub async fn connect() -> GreetdResult<Self> {
-        let stream = UnixStream::connect("/run/greetd.sock").await?;
+        // First check if GREETD_SOCK environment variable is set
+        let socket_path = std::env::var("GREETD_SOCK")
+            .unwrap_or_else(|_| "/run/greetd.sock".to_string());
+            
+        let stream = UnixStream::connect(socket_path).await?;
         Ok(Self { stream })
     }
     
@@ -31,14 +36,14 @@ impl GreetdClient {
         let request = Request::CreateSession {
             username: username.to_string(),
         };
-        self.send_request(&request).await?;
+        self.send_request(request).await?;
         
         // Handle response
         match self.read_response().await? {
             Response::AuthMessage { auth_message_type, .. } => {
                 match auth_message_type {
-                    AuthMessageType::Secret | AuthMessageType::SecretVisible => {
-                        // Send password
+                    AuthMessageType::Secret { .. } => {
+                        // Send password exactly as provided, do not trim or alter whitespace
                         self.send_password(password).await?;
                     }
                     _ => return Err("Unexpected auth message type".into()),
@@ -52,13 +57,15 @@ impl GreetdClient {
         
         Ok(())
     }
-    
+
     /// Send password response
+    /// Password is sent verbatim, including any whitespace.
     async fn send_password(&mut self, password: &str) -> GreetdResult<()> {
         let request = Request::PostAuthMessageResponse {
+            // Do NOT trim or modify the password; send as-is
             response: Some(password.to_string()),
         };
-        self.send_request(&request).await?;
+        self.send_request(request).await?;
         
         // Check if authentication succeeded
         match self.read_response().await? {
@@ -87,7 +94,7 @@ impl GreetdClient {
             env: vec![], // Environment will be set up by greetd
         };
         
-        self.send_request(&request).await?;
+        self.send_request(request).await?;
         
         // Session should start, we might not get a response
         // as greetd might exec into the session
@@ -95,9 +102,10 @@ impl GreetdClient {
     }
     
     /// Cancel the current session
+    #[allow(dead_code)] // TODO: Remove this when the method is used
     pub async fn cancel_session(&mut self) -> GreetdResult<()> {
         let request = Request::CancelSession;
-        self.send_request(&request).await?;
+        self.send_request(request).await?;
         
         match self.read_response().await? {
             Response::Success => Ok(()),
@@ -109,14 +117,41 @@ impl GreetdClient {
     }
     
     /// Send a request to greetd
-    async fn send_request(&mut self, request: &Request) -> GreetdResult<()> {
-        greetd_ipc::send(&mut self.stream, request).await?;
+    /// The greetd IPC protocol uses length-prefixed JSON messages
+    async fn send_request(&mut self, request: Request) -> GreetdResult<()> {
+        // Serialize the request to JSON
+        let msg = serde_json::to_vec(&request)?;
+        
+        // Write length prefix (4 bytes, native endian)
+        let len = (msg.len() as u32).to_ne_bytes();
+        self.stream.write_all(&len).await?;
+        
+        // Write the JSON message
+        self.stream.write_all(&msg).await?;
+        self.stream.flush().await?;
+        
         Ok(())
     }
     
     /// Read a response from greetd
+    /// The greetd IPC protocol uses length-prefixed JSON messages
     async fn read_response(&mut self) -> GreetdResult<Response> {
-        let response = greetd_ipc::read(&mut self.stream).await?;
+        // Read length prefix (4 bytes, native endian)
+        let mut len_buf = [0u8; 4];
+        self.stream.read_exact(&mut len_buf).await?;
+        let len = u32::from_ne_bytes(len_buf) as usize;
+        
+        // Sanity check to prevent huge allocations
+        if len > 1024 * 1024 {
+            return Err("Response too large".into());
+        }
+        
+        // Read the JSON message
+        let mut msg_buf = vec![0u8; len];
+        self.stream.read_exact(&mut msg_buf).await?;
+        
+        // Deserialize the response
+        let response: Response = serde_json::from_slice(&msg_buf)?;
         Ok(response)
     }
 }
