@@ -1,0 +1,37 @@
+{
+  "last_user": "",
+  "sessions": [
+    {
+      "name": "Hyprland",
+      "command": "Hyprland"
+    },
+    {
+      "name": "Sway", 
+      "command": "sway"
+    },
+    {
+      "name": "TTY",
+      "command": "/bin/bash"
+    }
+  ],
+  
+  "ui": {
+    "show_clock": true,
+    "clock_format": "%H:%M",
+    "show_date": true,
+    "date_format": "%A, %d %B %Y",
+    "colors": {
+      "background": "#1a1b26",
+      "foreground": "#c0caf5",
+      "focused": "#f7768e",
+      "error": "#f7768e",
+      "success": "#9ece6a"
+    }
+  },
+  
+  "security": {
+    "clear_password_on_error": true,
+    "mask_password": true,
+    "input_timeout": 0
+  }
+}

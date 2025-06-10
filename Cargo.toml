@@ -1,0 +1,37 @@
+[package]
+name = "hypr-greeter"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A custom TUI greeter for Hyprland with multi-monitor support"
+license = "MIT"
+
+[dependencies]
+# TUI framework for terminal user interface
+ratatui = "0.26"
+
+# Terminal manipulation (raw mode, events, etc.)
+crossterm = "0.27"
+
+# Serialization for config files
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime for greetd communication
+tokio = { version = "1.36", features = ["full"] }
+
+# greetd IPC protocol implementation
+greetd_ipc = "0.10"
+
+# For finding config directories
+dirs = "5.0"
+
+# Time handling for clock feature (optional)
+chrono = "0.4"
+
+[profile.release]
+# Optimize for size
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
