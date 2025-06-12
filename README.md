@@ -28,8 +28,11 @@ To set the keyboard layout for the greeter (Cage session), add the environment v
 command = "env XKB_DEFAULT_LAYOUT=de cage -s -- hypr-greeter"
 user = "greeter"
 ```
+```toml
+env XKB_DEFAULT_LAYOUT=de
+```
 
-Replace `de` with your desired layout (e.g., `ch`, `sg`, etc.).
+Replace `de` with your desired layout (e.g., `us`, `ch`, etc.).
 
 - This ensures the layout is set before Cage (the compositor for the greeter) starts.
 - The `config.json` keyboard section is no longer used and can be removed.
@@ -40,11 +43,10 @@ Replace `de` with your desired layout (e.g., `ch`, `sg`, etc.).
 ## Installation
 
 ```bash
-sudo pacman -S greetd cage alacritty rust
-git clone https://github.com/yourusername/hypr-greeter
+git clone https://github.com/obamosaurus/hypr-greeter
 cd hypr-greeter
 chmod +x install.sh
-sudo ./install.sh
+sudo bash install.sh
 sudo systemctl start greetd
 ```
 
@@ -61,9 +63,18 @@ sudo systemctl start greetd
   "default_user": "",
   "disable_autofill": false,
   "sessions": [
-    { "name": "Hyprland", "command": "Hyprland" },
-    { "name": "Sway", "command": "sway" },
-    { "name": "TTY", "command": "/bin/bash" }
+    {
+      "name": "Hyprland",
+      "command": "Hyprland"
+    },
+    {
+      "name": "Sway",
+      "command": "sway"
+    },
+    {
+      "name": "TTY",
+      "command": "/bin/bash"
+    }
   ],
   "ui": {
     "show_clock": true,
@@ -80,9 +91,9 @@ sudo systemctl start greetd
     "field_width": 50,
     "field_height": 100,
     "field_spacing": 0,
-    "top_to_clock_spacing": 1,
-    "clock_to_fields_spacing": 1,
-    "title": "My Hyprland Greeter"
+    "top_to_clock_spacing": 15,
+    "clock_to_fields_spacing": 0,
+    "title": "hypr-greeter"
   },
   "security": {
     "clear_password_on_error": true,
@@ -112,27 +123,9 @@ sudo ./uninstall.sh
 
 ---
 
-## Project Structure
-
-```
-hypr-greeter/
-├── Cargo.toml
-├── install.sh
-├── uninstall.sh
-├── README.md
-└── src/
-    ├── main.rs
-    ├── config.rs
-    ├── greetd_client.rs
-    └── ui.rs
-```
-
----
-
 ## Development
 
 - **Build:** `cargo build` or `cargo build --release`
-- **Run:** `cargo run`
 - **Edit configs:** See above
 
 ---

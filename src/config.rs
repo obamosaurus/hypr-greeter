@@ -154,24 +154,46 @@ pub fn config_path() -> PathBuf {
 /// Load configuration from disk
 pub fn load_config() -> Result<Config, Box<dyn Error>> {
     let path = config_path();
-    if path.exists() {
-        let content = std::fs::read_to_string(path)?;
+    let mut config = if path.exists() {
+        let content = std::fs::read_to_string(&path)?;
         // Remove comments for JSON parsing
         let cleaned = remove_json_comments(&content);
-        Ok(serde_json::from_str(&cleaned)?)
+        serde_json::from_str(&cleaned)?
     } else {
-        Ok(Config::default())
+        Config::default()
+    };
+    // Check for per-user last_user override
+    let user_file = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("~/.config"))
+        .join("hypr-greeter")
+        .join("last_user.json");
+    if user_file.exists() {
+        let content = std::fs::read_to_string(&user_file)?;
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(last_user) = json.get("last_user").and_then(|v| v.as_str()) {
+                config.last_user = last_user.to_string();
+            }
+        }
     }
+    Ok(config)
 }
 
-/// Save configuration to disk
-pub fn save_config(config: &Config) -> Result<(), Box<dyn Error>> {
-    let path = config_path();
-    if let Some(parent) = path.parent() {
+/// Save only the last_user field to a user file (~/.config/hypr-greeter/last_user.json)
+pub fn save_last_user(username: &str) -> Result<(), Box<dyn Error>> {
+    let user_file = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("~/.config"))
+        .join("hypr-greeter")
+        .join("last_user.json");
+    // Only store the username in a minimal JSON
+    let content = serde_json::to_string_pretty(&serde_json::json!({"last_user": username}))?;
+    if let Some(parent) = user_file.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let content = serde_json::to_string_pretty(config)?;
-    std::fs::write(path, content)?;
+    use std::io::Write;
+    let mut file = std::fs::File::create(user_file)?;
+    file.write_all(content.as_bytes())?;
+    file.flush()?;
+    file.sync_all()?;
     Ok(())
 }
 
