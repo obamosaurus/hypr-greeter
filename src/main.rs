@@ -19,11 +19,16 @@ use std::error::Error;
 use std::io;
 use ui::{App, Focus};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
+    // Use a tokio runtime manually to avoid proc-macro issues
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async_main())
+}
+
+async fn async_main() -> Result<(), Box<dyn Error>> {
     // Load configuration
-     let config = load_config()?;
-    
+    let config = load_config()?;
+
     // Setup terminal
     setup_terminal()?;
     

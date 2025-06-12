@@ -2,7 +2,7 @@
 name = "hypr-greeter"
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["obamosaurus"]
 description = "A custom TUI greeter for Hyprland with multi-monitor support"
 license = "MIT"
 

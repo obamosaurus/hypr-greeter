@@ -24,3 +24,7 @@ Cargo.lock
 
 # Misc
 *.tmp
+
+full-uninstall.sh
+features.txt
+.gitignore

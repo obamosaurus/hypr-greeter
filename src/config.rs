@@ -10,7 +10,11 @@ use std::path::PathBuf;
 pub struct Config {
     /// Last logged in username - will be pre-filled
     pub last_user: String,
-    
+    /// Username to autofill at startup (if set, overrides last_user)
+    pub default_user: Option<String>,
+    /// If true, disables autofilling username at startup
+    pub disable_autofill: Option<bool>,
+
     /// Available sessions/WMs
     pub sessions: Vec<Session>,
     
@@ -36,18 +40,29 @@ pub struct Session {
 pub struct UiConfig {
     /// Show clock in the UI
     pub show_clock: bool,
-    
     /// Clock format (chrono format string)
     pub clock_format: String,
-    
     /// Show date under clock
     pub show_date: bool,
-    
     /// Date format (chrono format string)
     pub date_format: String,
-    
     /// Color scheme (for future use)
     pub colors: ColorScheme,
+
+    // Login field dimensions (percentage scale: 100 = normal, 50 = half, 200 = double, etc)
+    pub field_width: Option<u32>,    // percent scale
+    pub field_height: Option<u32>,   // percent scale
+
+    /// Spacing between input fields (in rows/lines)
+    pub field_spacing: Option<u32>,
+
+    /// Spacing from top of screen to clock/date (in rows/lines)
+    pub top_to_clock_spacing: Option<u32>,
+    /// Spacing from clock/date to input fields (in rows/lines)
+    pub clock_to_fields_spacing: Option<u32>,
+
+    /// Title text for the greeter
+    pub title: Option<String>,
 }
 
 /// Color configuration
@@ -77,6 +92,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             last_user: String::new(),
+            default_user: None,
+            disable_autofill: None,
             sessions: vec![
                 Session {
                     name: "Hyprland".to_string(),
@@ -103,6 +120,12 @@ impl Default for Config {
                     error: "#f7768e".to_string(),
                     success: "#9ece6a".to_string(),
                 },
+                field_width: Some(100), // 100% (normal)
+                field_height: Some(100), // 100% (normal)
+                field_spacing: Some(1),
+                top_to_clock_spacing: Some(100), // 100% (normal, interpreted as 1 row)
+                clock_to_fields_spacing: Some(100), // 100% (normal, interpreted as 1 row)
+                title: Some("Hyprland Greeter".to_string()),
             },
             security: SecurityConfig {
                 clear_password_on_error: true,

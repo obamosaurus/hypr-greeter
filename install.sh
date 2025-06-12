@@ -12,6 +12,42 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Check and install dependencies
+echo "Checking dependencies..."
+
+# Function to check if a package is installed
+is_installed() {
+    pacman -Qi "$1" &> /dev/null
+}
+
+# Install required packages
+DEPS=("greetd" "cage" "alacritty" "cargo" "rust")
+for pkg in "${DEPS[@]}"; do
+    if ! is_installed "$pkg"; then
+        echo "Installing $pkg..."
+        if ! pacman -S --noconfirm "$pkg"; then
+            # If package not found in official repos, try AUR
+            if command -v yay &> /dev/null; then
+                echo "Package not found in official repos, trying AUR..."
+                su - $SUDO_USER -c "yay -S --noconfirm $pkg"
+            else
+                echo "Error: $pkg not found in official repos and yay is not installed"
+                echo "Please install $pkg manually"
+                exit 1
+            fi
+        fi
+    else
+        echo "$pkg is already installed"
+    fi
+done
+
+# Ensure cargo is available
+if ! command -v cargo &> /dev/null; then
+    echo "Error: cargo is not installed or not in PATH after attempted install."
+    echo "Please ensure Rust and Cargo are installed and available in your PATH."
+    exit 1
+fi
+
 # Build the greeter
 echo "Building hypr-greeter..."
 cargo build --release
@@ -27,43 +63,7 @@ mkdir -p /etc/hypr-greeter
 # Install default config if it doesn't exist
 if [ ! -f /etc/hypr-greeter/config.json ]; then
     echo "Installing default config..."
-    cat > /etc/hypr-greeter/config.json << 'EOF'
-{
-  "last_user": "",
-  "sessions": [
-    {
-      "name": "Hyprland",
-      "command": "Hyprland"
-    },
-    {
-      "name": "Sway",
-      "command": "sway"
-    },
-    {
-      "name": "TTY",
-      "command": "/bin/bash"
-    }
-  ],
-  "ui": {
-    "show_clock": true,
-    "clock_format": "%H:%M",
-    "show_date": true,
-    "date_format": "%A, %d %B %Y",
-    "colors": {
-      "background": "#1a1b26",
-      "foreground": "#c0caf5",
-      "focused": "#f7768e",
-      "error": "#f7768e",
-      "success": "#9ece6a"
-    }
-  },
-  "security": {
-    "clear_password_on_error": true,
-    "mask_password": true,
-    "input_timeout": 0
-  }
-}
-EOF
+    cp "$(dirname "$0")/config.json" /etc/hypr-greeter/config.json
 fi
 
 # Create greeter user if it doesn't exist
@@ -76,6 +76,13 @@ fi
 # Install greetd config
 echo "Installing greetd config..."
 mkdir -p /etc/greetd
+
+# Clean up any pacnew file if it exists
+if [ -f /etc/greetd/config.toml.pacnew ]; then
+    echo "Removing old .pacnew file..."
+    rm /etc/greetd/config.toml.pacnew
+fi
+
 cat > /etc/greetd/config.toml << 'EOF'
 [terminal]
 vt = 1
@@ -115,11 +122,6 @@ systemctl enable greetd.service
 
 echo ""
 echo "Installation complete!"
-echo ""
-echo "Required packages (install with pacman):"
-echo "  - greetd"
-echo "  - cage"
-echo "  - alacritty (or another terminal emulator)"
 echo ""
 echo "To start the greeter now:"
 echo "  sudo systemctl start greetd"
