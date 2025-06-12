@@ -31,9 +31,9 @@
     "field_width": 50,
     "field_height": 100,
     "field_spacing": 0,
-    "top_to_clock_spacing": 1,
-    "clock_to_fields_spacing": 1,
-    "title": "My Hyprland Greeter"
+    "top_to_clock_spacing": 15,
+    "clock_to_fields_spacing": 0,
+    "title": "hypr-greeter"
   },
   "security": {
     "clear_password_on_error": true,

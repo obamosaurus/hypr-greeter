@@ -5,7 +5,7 @@ mod config;
 mod greetd_client;
 mod ui;
 
-use config::{load_config, save_config};
+use config::load_config;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -100,10 +100,12 @@ async fn run_app<B: ratatui::backend::Backend>(
                             app.current_session_command(),
                         ).await {
                             Ok(_) => {
-                                // Save last username
-                                app.config.last_user = app.username.clone();
-                                save_config(&app.config)?;
-                                
+                                // Save last username to user config (always writable)
+                                if let Err(e) = crate::config::save_last_user(&app.username) {
+                                    eprintln!("Failed to save last_user: {}", e);
+                                }
+                                // Add a short delay to ensure file is written before exit
+                                std::thread::sleep(std::time::Duration::from_millis(100));
                                 // Exit - greetd will handle the session
                                 break;
                             }

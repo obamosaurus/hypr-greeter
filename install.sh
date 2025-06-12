@@ -73,6 +73,17 @@ if ! id "greeter" &>/dev/null; then
     passwd -d greeter
 fi
 
+# Ensure greeter user has a home directory and config dir
+if id "greeter" &>/dev/null; then
+    GREETER_HOME=$(getent passwd greeter | cut -d: -f6)
+    if [ -z "$GREETER_HOME" ] || [ "$GREETER_HOME" = "/" ] || [ "$GREETER_HOME" = "/nonexistent" ]; then
+        GREETER_HOME="/var/lib/greeter"
+        usermod -d "$GREETER_HOME" greeter
+    fi
+    mkdir -p "$GREETER_HOME/.config/hypr-greeter"
+    chown -R greeter:greeter "$GREETER_HOME/.config" "$GREETER_HOME"
+fi
+
 # Install greetd config
 echo "Installing greetd config..."
 mkdir -p /etc/greetd
@@ -88,10 +99,6 @@ cat > /etc/greetd/config.toml << 'EOF'
 vt = 1
 
 [default_session]
-command = "cage -s -- alacritty -e /usr/local/bin/hypr-greeter"
-user = "greeter"
-
-[initial_session]
 command = "cage -s -- alacritty -e /usr/local/bin/hypr-greeter"
 user = "greeter"
 EOF
