@@ -28,7 +28,7 @@ To set the keyboard layout for the greeter (Cage session), add the environment v
 command = "env XKB_DEFAULT_LAYOUT=de cage -s -- hypr-greeter"
 user = "greeter"
 ```
-```toml
+```bash
 env XKB_DEFAULT_LAYOUT=de
 ```
 
@@ -59,7 +59,6 @@ sudo systemctl start greetd
 
 ```json
 {
-  "last_user": "",
   "default_user": "",
   "disable_autofill": false,
   "sessions": [
