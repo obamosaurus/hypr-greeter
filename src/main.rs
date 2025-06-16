@@ -94,22 +94,26 @@ async fn run_app<B: ratatui::backend::Backend>(
                 KeyCode::Enter => {
                     if !app.username.is_empty() && !app.password.is_empty() {
                         // Attempt login
-                        match greetd_client::login(
+                        let login_result = greetd_client::login(
                             &app.username,
                             &app.password,
                             app.current_session_command(),
-                        ).await {
+                        ).await;
+                        match login_result {
                             Ok(_) => {
-                                // Save last username to user config (always writable)
+                                // Save last_user for fallback autofill
                                 if let Err(e) = crate::config::save_last_user(&app.username) {
                                     eprintln!("Failed to save last_user: {}", e);
                                 }
-                                // Add a short delay to ensure file is written before exit
                                 std::thread::sleep(std::time::Duration::from_millis(100));
                                 // Exit - greetd will handle the session
                                 break;
                             }
                             Err(e) => {
+                                // Try to cancel the session so user can retry
+                                if let Ok(mut client) = greetd_client::GreetdClient::connect().await {
+                                    let _ = client.cancel_session().await;
+                                }
                                 app.set_error(format!("Login failed: {}", e));
                             }
                         }

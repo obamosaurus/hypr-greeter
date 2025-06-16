@@ -8,8 +8,8 @@ use std::path::PathBuf;
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    /// Last logged in username - will be pre-filled
-    pub last_user: String,
+    /// Last logged in username - will be used for autofill fallback
+    pub last_user: Option<String>,
     /// Username to autofill at startup (if set, overrides last_user)
     pub default_user: Option<String>,
     /// If true, disables autofilling username at startup
@@ -91,7 +91,7 @@ pub struct SecurityConfig {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            last_user: String::new(),
+            last_user: None,
             default_user: None,
             disable_autofill: None,
             sessions: vec![
@@ -162,39 +162,17 @@ pub fn load_config() -> Result<Config, Box<dyn Error>> {
     } else {
         Config::default()
     };
-    // Check for per-user last_user override
-    let user_file = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
-        .join("hypr-greeter")
-        .join("last_user.json");
+    // Optionally load last_user from file for fallback autofill
+    let user_file = std::path::PathBuf::from("/var/lib/greetd/last_user.json");
     if user_file.exists() {
         let content = std::fs::read_to_string(&user_file)?;
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
             if let Some(last_user) = json.get("last_user").and_then(|v| v.as_str()) {
-                config.last_user = last_user.to_string();
+                config.last_user = Some(last_user.to_string());
             }
         }
     }
     Ok(config)
-}
-
-/// Save only the last_user field to a user file (~/.config/hypr-greeter/last_user.json)
-pub fn save_last_user(username: &str) -> Result<(), Box<dyn Error>> {
-    let user_file = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
-        .join("hypr-greeter")
-        .join("last_user.json");
-    // Only store the username in a minimal JSON
-    let content = serde_json::to_string_pretty(&serde_json::json!({"last_user": username}))?;
-    if let Some(parent) = user_file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    use std::io::Write;
-    let mut file = std::fs::File::create(user_file)?;
-    file.write_all(content.as_bytes())?;
-    file.flush()?;
-    file.sync_all()?;
-    Ok(())
 }
 
 /// Remove // style comments from JSON
@@ -209,4 +187,19 @@ fn remove_json_comments(json: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Save the last logged in username to a file
+pub fn save_last_user(username: &str) -> Result<(), Box<dyn Error>> {
+    let user_file = std::path::PathBuf::from("/var/lib/greetd/last_user.json");
+    let content = serde_json::to_string_pretty(&serde_json::json!({"last_user": username}))?;
+    if let Some(parent) = user_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    use std::io::Write;
+    let mut file = std::fs::File::create(user_file)?;
+    file.write_all(content.as_bytes())?;
+    file.flush()?;
+    file.sync_all()?;
+    Ok(())
 }
