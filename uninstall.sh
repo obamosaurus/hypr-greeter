@@ -1,6 +1,5 @@
 #!/bin/bash
 # Uninstall script for hypr-greeter
-# Run with: chmod +x uninstall.sh && sudo ./uninstall.sh
 
 set -e
 
@@ -29,12 +28,19 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     rm -rf /etc/hypr-greeter
     rm -f /etc/greetd/config.toml
     rm -rf /etc/systemd/system/greetd.service.d
+    rm -rf /var/lib/greetd
 fi
+
+rm -rf /home/nyx/Documents/github/hypr-greeter/target
+rm -r Cargo.lock
+sudo pacman -Rns greetd
 
 echo ""
 echo "Uninstallation complete!"
 echo ""
 echo "You may want to remove these packages if no longer needed:"
-echo "  - greetd"
+echo "  - alacritty"
 echo "  - cage"
+echo "  - greetd"
+echo "  - rust"
 echo ""

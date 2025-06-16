@@ -33,11 +33,16 @@ pub enum Focus {
 impl App {
     /// Create new app state
     pub fn new(config: Config) -> Self {
-        // Determine username autofill logic
         let autofill = !config.disable_autofill.unwrap_or(false);
         let (username, focus) = if autofill {
             let user = config.default_user.as_ref().map(|u| u.as_str()).unwrap_or("");
-            let username = if !user.is_empty() { user.to_string() } else { config.last_user.clone() };
+            let username = if !user.is_empty() {
+                user.to_string()
+            } else if let Some(last) = config.last_user.as_ref() {
+                if !last.is_empty() { last.clone() } else { String::new() }
+            } else {
+                String::new()
+            };
             let focus = if username.is_empty() { Focus::Username } else { Focus::Password };
             (username, focus)
         } else {

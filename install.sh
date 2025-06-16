@@ -1,6 +1,5 @@
 #!/bin/bash
 # Installation script for hypr-greeter
-# Run with: chmod +x install.sh && sudo ./install.sh
 
 set -e
 
@@ -83,6 +82,22 @@ if id "greeter" &>/dev/null; then
     mkdir -p "$GREETER_HOME/.config/hypr-greeter"
     chown -R greeter:greeter "$GREETER_HOME/.config" "$GREETER_HOME"
 fi
+
+# Ensure greetd user exists
+if ! id -u greetd &>/dev/null; then
+    echo "greetd user not found. Creating system user 'greetd'..."
+    useradd --system --no-create-home --shell /usr/bin/nologin greetd
+fi
+
+# Ensure /var/lib/greetd exists and is owned by greetd
+if [ ! -d /var/lib/greetd ]; then
+    echo "Creating /var/lib/greetd..."
+    mkdir -p /var/lib/greetd
+fi
+chown greetd:greetd /var/lib/greetd
+# Add greeter to greetd group so it can write last_user.json
+gpasswd -a greeter greetd
+chmod 770 /var/lib/greetd
 
 # Install greetd config
 echo "Installing greetd config..."

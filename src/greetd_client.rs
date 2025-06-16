@@ -102,11 +102,9 @@ impl GreetdClient {
     }
     
     /// Cancel the current session
-    #[allow(dead_code)] // TODO: Remove this when the method is used
     pub async fn cancel_session(&mut self) -> GreetdResult<()> {
         let request = Request::CancelSession;
         self.send_request(request).await?;
-        
         match self.read_response().await? {
             Response::Success => Ok(()),
             Response::Error { error_type, description } => {
