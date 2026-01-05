@@ -1,0 +1,1 @@
+/home/runner/work/hypr-greeter/hypr-greeter/target/release/hypr-greeter: /home/runner/work/hypr-greeter/hypr-greeter/src/config.rs /home/runner/work/hypr-greeter/hypr-greeter/src/greetd_client.rs /home/runner/work/hypr-greeter/hypr-greeter/src/main.rs /home/runner/work/hypr-greeter/hypr-greeter/src/ui.rs

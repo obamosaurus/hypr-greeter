@@ -11,39 +11,49 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Check and install dependencies
-echo "Checking dependencies..."
+# Detect package manager
+if command -v pacman &> /dev/null; then
+    PKG_MANAGER="pacman"
+    INSTALL_CMD="pacman -S --needed --noconfirm"
+elif command -v apt &> /dev/null; then
+    PKG_MANAGER="apt"
+    INSTALL_CMD="apt install -y"
+elif command -v dnf &> /dev/null; then
+    PKG_MANAGER="dnf"
+    INSTALL_CMD="dnf install -y"
+elif command -v zypper &> /dev/null; then
+    PKG_MANAGER="zypper"
+    INSTALL_CMD="zypper install -y"
+else
+    echo "Unsupported package manager. Please install dependencies manually:"
+    echo "  - greetd"
+    echo "  - cage"
+    echo "  - rust/cargo"
+    exit 1
+fi
 
-# Function to check if a package is installed
-is_installed() {
-    pacman -Qi "$1" &> /dev/null
-}
+echo "Detected package manager: $PKG_MANAGER"
 
-# Install required packages
-DEPS=("greetd" "cage" "alacritty" "cargo" "rust")
-for pkg in "${DEPS[@]}"; do
-    if ! is_installed "$pkg"; then
-        echo "Installing $pkg..."
-        if ! pacman -S --noconfirm "$pkg"; then
-            # If package not found in official repos, try AUR
-            if command -v yay &> /dev/null; then
-                echo "Package not found in official repos, trying AUR..."
-                su - $SUDO_USER -c "yay -S --noconfirm $pkg"
-            else
-                echo "Error: $pkg not found in official repos and yay is not installed"
-                echo "Please install $pkg manually"
-                exit 1
-            fi
-        fi
-    else
-        echo "$pkg is already installed"
-    fi
-done
+# Install dependencies based on package manager
+echo "Installing dependencies..."
+case $PKG_MANAGER in
+    pacman)
+        $INSTALL_CMD greetd cage rust
+        ;;
+    apt)
+        $INSTALL_CMD greetd cage cargo
+        ;;
+    dnf)
+        $INSTALL_CMD greetd cage cargo
+        ;;
+    zypper)
+        $INSTALL_CMD greetd cage cargo
+        ;;
+esac
 
 # Ensure cargo is available
 if ! command -v cargo &> /dev/null; then
-    echo "Error: cargo is not installed or not in PATH after attempted install."
-    echo "Please ensure Rust and Cargo are installed and available in your PATH."
+    echo "Error: cargo is not installed. Please install Rust/Cargo manually."
     exit 1
 fi
 
@@ -55,14 +65,11 @@ cargo build --release
 echo "Installing binary..."
 install -Dm755 target/release/hypr-greeter /usr/local/bin/hypr-greeter
 
-# Create config directory
-echo "Creating config directory..."
+# Create config directory and install default config
+echo "Installing config..."
 mkdir -p /etc/hypr-greeter
-
-# Install default config if it doesn't exist
 if [ ! -f /etc/hypr-greeter/config.json ]; then
-    echo "Installing default config..."
-    cp "$(dirname "$0")/config.json" /etc/hypr-greeter/config.json
+    cp config.json /etc/hypr-greeter/config.json
 fi
 
 # Create greeter user if it doesn't exist
@@ -72,78 +79,31 @@ if ! id "greeter" &>/dev/null; then
     passwd -d greeter
 fi
 
-# Ensure greeter user has a home directory and config dir
-if id "greeter" &>/dev/null; then
-    GREETER_HOME=$(getent passwd greeter | cut -d: -f6)
-    if [ -z "$GREETER_HOME" ] || [ "$GREETER_HOME" = "/" ] || [ "$GREETER_HOME" = "/nonexistent" ]; then
-        GREETER_HOME="/var/lib/greeter"
-        usermod -d "$GREETER_HOME" greeter
-    fi
-    mkdir -p "$GREETER_HOME/.config/hypr-greeter"
-    chown -R greeter:greeter "$GREETER_HOME/.config" "$GREETER_HOME"
-fi
-
-# Ensure greetd user exists
-if ! id -u greetd &>/dev/null; then
-    echo "greetd user not found. Creating system user 'greetd'..."
-    useradd --system --no-create-home --shell /usr/bin/nologin greetd
-fi
-
-# Ensure /var/lib/greetd exists and is owned by greetd
-if [ ! -d /var/lib/greetd ]; then
-    echo "Creating /var/lib/greetd..."
-    mkdir -p /var/lib/greetd
-fi
-chown greetd:greetd /var/lib/greetd
-# Add greeter to greetd group so it can write last_user.json
-gpasswd -a greeter greetd
-chmod 770 /var/lib/greetd
+# Create greetd data directory
+mkdir -p /var/lib/greetd
+chown -R greeter:greeter /var/lib/greetd
 
 # Install greetd config
-echo "Installing greetd config..."
+echo "Configuring greetd..."
 mkdir -p /etc/greetd
-
-# Clean up any pacnew file if it exists
-if [ -f /etc/greetd/config.toml.pacnew ]; then
-    echo "Removing old .pacnew file..."
-    rm /etc/greetd/config.toml.pacnew
-fi
-
 cat > /etc/greetd/config.toml << 'EOF'
 [terminal]
 vt = 1
 
 [default_session]
-command = "cage -s -- alacritty -e /usr/local/bin/hypr-greeter"
+command = "cage -s -- /usr/local/bin/hypr-greeter"
 user = "greeter"
 EOF
 
-# Create systemd override directory
-mkdir -p /etc/systemd/system/greetd.service.d
-
-# Install systemd override
-cat > /etc/systemd/system/greetd.service.d/override.conf << 'EOF'
-[Service]
-After=systemd-user-sessions.service plymouth-quit-wait.service
-Environment="XDG_SESSION_TYPE=wayland"
-TimeoutStartSec=30s
-Restart=always
-RestartSec=1s
-KillMode=process
-EOF
-
-# Set permissions
-chmod 644 /etc/hypr-greeter/config.json
-chmod 644 /etc/greetd/config.toml
-chmod 755 /usr/local/bin/hypr-greeter
-
-# Enable and start greetd
+# Enable greetd service
 echo "Enabling greetd service..."
 systemctl daemon-reload
 systemctl enable greetd.service
 
 echo ""
 echo "Installation complete!"
+echo ""
+echo "Configuration file: /etc/hypr-greeter/config.json"
 echo ""
 echo "To start the greeter now:"
 echo "  sudo systemctl start greetd"

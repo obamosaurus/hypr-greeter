@@ -11,7 +11,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Stop greetd service
+# Stop and disable greetd service
 echo "Stopping greetd service..."
 systemctl stop greetd.service || true
 systemctl disable greetd.service || true
@@ -27,20 +27,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Removing config files..."
     rm -rf /etc/hypr-greeter
     rm -f /etc/greetd/config.toml
-    rm -rf /etc/systemd/system/greetd.service.d
     rm -rf /var/lib/greetd
 fi
 
-rm -rf /home/nyx/Documents/github/hypr-greeter/target
-rm -r Cargo.lock
-sudo pacman -Rns greetd
-
 echo ""
 echo "Uninstallation complete!"
-echo ""
-echo "You may want to remove these packages if no longer needed:"
-echo "  - alacritty"
-echo "  - cage"
-echo "  - greetd"
-echo "  - rust"
 echo ""
