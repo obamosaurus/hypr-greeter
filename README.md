@@ -51,7 +51,8 @@ Edit `/etc/hypr-greeter/config.json`:
   ],
   "background": "#1a1b26",
   "show_clock": true,
-  "title": "Welcome"
+  "title": "Welcome",
+  "keyboard_layout": "us"
 }
 ```
 
@@ -63,20 +64,35 @@ Edit `/etc/hypr-greeter/config.json`:
 - **background**: Background color (hex format)
 - **show_clock**: Show clock and date (true/false)
 - **title**: Title text displayed at the top
+- **keyboard_layout**: Keyboard layout (e.g., "us", "de", "fr", "ch", etc.) - optional
 
 ---
 
 ## Keyboard Layout
 
-Set keyboard layout via greetd config (`/etc/greetd/config.toml`):
+You can configure the keyboard layout in two ways:
+
+### Method 1: In hypr-greeter config (Recommended)
+
+Simply add the `keyboard_layout` field to `/etc/hypr-greeter/config.json`:
+
+```json
+{
+  "keyboard_layout": "de"
+}
+```
+
+Replace `de` with your layout (e.g., `us`, `ch`, `fr`, etc.).
+
+### Method 2: Via greetd config
+
+Alternatively, set keyboard layout via greetd config (`/etc/greetd/config.toml`):
 
 ```toml
 [default_session]
 command = "env XKB_DEFAULT_LAYOUT=de cage -s -- /usr/local/bin/hypr-greeter"
 user = "greeter"
 ```
-
-Replace `de` with your layout (e.g., `us`, `ch`, etc.).
 
 ---
 

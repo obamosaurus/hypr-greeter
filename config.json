@@ -15,5 +15,6 @@
   ],
   "background": "#1a1b26",
   "show_clock": true,
-  "title": "Welcome"
+  "title": "Welcome",
+  "keyboard_layout": "us"
 }

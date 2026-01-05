@@ -29,6 +29,11 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     // Load configuration
     let config = load_config()?;
 
+    // Set keyboard layout if configured
+    if let Some(ref layout) = config.keyboard_layout {
+        std::env::set_var("XKB_DEFAULT_LAYOUT", layout);
+    }
+
     // Setup terminal
     setup_terminal()?;
     
