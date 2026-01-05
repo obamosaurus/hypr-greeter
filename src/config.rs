@@ -23,6 +23,10 @@ pub struct Config {
     #[serde(default = "default_title")]
     pub title: String,
 
+    /// Keyboard layout (e.g., "us", "de", "fr", etc.)
+    #[serde(default)]
+    pub keyboard_layout: Option<String>,
+
     /// Last logged in username - loaded from separate file
     #[serde(skip)]
     pub last_user: Option<String>,
@@ -70,6 +74,7 @@ impl Default for Config {
             background: default_background(),
             show_clock: true,
             title: default_title(),
+            keyboard_layout: None,
             last_user: None,
         }
     }
