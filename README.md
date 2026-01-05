@@ -22,6 +22,12 @@ git clone https://github.com/obamosaurus/hypr-greeter
 cd hypr-greeter
 chmod +x install.sh
 sudo ./install.sh
+```
+
+During installation, you'll be prompted to select your keyboard layout from a list of common layouts. If you prefer, you can skip this step and configure it manually later.
+
+After installation:
+```bash
 sudo systemctl start greetd
 ```
 
