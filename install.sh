@@ -134,11 +134,12 @@ if [ ! -f /etc/hypr-greeter/config.json ]; then
     # Create config with selected keyboard layout
     if [ -n "$KEYBOARD_LAYOUT" ]; then
         echo "Setting keyboard layout to: $KEYBOARD_LAYOUT"
-        sed "s/\"keyboard_layout\": \"us\"/\"keyboard_layout\": \"$KEYBOARD_LAYOUT\"/" config.json > /etc/hypr-greeter/config.json
+        # Use a more robust sed pattern that matches the keyboard_layout field specifically
+        sed 's/\("keyboard_layout":\s*\)"[^"]*"/\1"'"$KEYBOARD_LAYOUT"'"/' config.json > /etc/hypr-greeter/config.json
     else
         echo "Skipping keyboard layout configuration"
-        # Remove keyboard_layout field if user skipped
-        grep -v '"keyboard_layout"' config.json > /etc/hypr-greeter/config.json
+        # Remove only the keyboard_layout line and fix trailing comma on previous line
+        sed -e '/^[[:space:]]*"keyboard_layout":/d' -e '/"title":/s/,$//' config.json > /etc/hypr-greeter/config.json
     fi
 else
     echo "Config already exists at /etc/hypr-greeter/config.json - skipping"
