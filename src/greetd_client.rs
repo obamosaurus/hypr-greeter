@@ -1,106 +1,135 @@
-// ~/hypr-greeter/src/greetd_client.rs
-// greetd IPC client implementation
-
 use greetd_ipc::{AuthMessageType, Request, Response};
-use std::error::Error;
+use std::fmt;
 use tokio::net::UnixStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+/// Typed error for greetd operations
+#[derive(Debug)]
+pub enum GreetdError {
+    ConnectionFailed(String),
+    AuthFailed(String),
+    SessionFailed(String),
+    Protocol(String),
+}
+
+impl fmt::Display for GreetdError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GreetdError::ConnectionFailed(msg) => write!(f, "Connection failed: {}", msg),
+            GreetdError::AuthFailed(msg) => write!(f, "Authentication failed: {}", msg),
+            GreetdError::SessionFailed(msg) => write!(f, "Session failed: {}", msg),
+            GreetdError::Protocol(msg) => write!(f, "Protocol error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for GreetdError {}
+
 /// Result type for greetd operations
-pub type GreetdResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+pub type GreetdResult<T> = Result<T, GreetdError>;
 
 /// greetd client for authentication
 pub struct GreetdClient {
-    /// Unix socket connection to greetd
     stream: UnixStream,
 }
 
 impl GreetdClient {
     /// Connect to greetd daemon
     pub async fn connect() -> GreetdResult<Self> {
-        // First check if GREETD_SOCK environment variable is set
         let socket_path = std::env::var("GREETD_SOCK")
             .unwrap_or_else(|_| "/run/greetd.sock".to_string());
-            
-        let stream = UnixStream::connect(socket_path).await?;
+
+        let stream = UnixStream::connect(&socket_path).await.map_err(|e| {
+            GreetdError::ConnectionFailed(format!("{}: {}", socket_path, e))
+        })?;
         Ok(Self { stream })
     }
-    
+
     /// Authenticate a user with password
     pub async fn authenticate(
         &mut self,
         username: &str,
         password: &str,
     ) -> GreetdResult<()> {
-        // Create session for user
         let request = Request::CreateSession {
             username: username.to_string(),
         };
         self.send_request(request).await?;
-        
-        // Handle response
+
         match self.read_response().await? {
             Response::AuthMessage { auth_message_type, .. } => {
                 match auth_message_type {
                     AuthMessageType::Secret { .. } => {
-                        // Send password exactly as provided, do not trim or alter whitespace
                         self.send_password(password).await?;
                     }
-                    _ => return Err("Unexpected auth message type".into()),
+                    _ => return Err(GreetdError::Protocol("Unexpected auth message type".into())),
                 }
             }
             Response::Error { error_type, description } => {
-                return Err(format!("Auth error: {:?} - {}", error_type, description).into());
+                return Err(GreetdError::AuthFailed(
+                    format!("{:?}: {}", error_type, description),
+                ));
             }
-            _ => return Err("Unexpected response during auth".into()),
+            _ => return Err(GreetdError::Protocol("Unexpected response during auth".into())),
         }
-        
+
         Ok(())
     }
 
     /// Send password response
-    /// Password is sent verbatim, including any whitespace.
     async fn send_password(&mut self, password: &str) -> GreetdResult<()> {
         let request = Request::PostAuthMessageResponse {
-            // Do NOT trim or modify the password; send as-is
             response: Some(password.to_string()),
         };
         self.send_request(request).await?;
-        
-        // Check if authentication succeeded
+
         match self.read_response().await? {
             Response::Success => Ok(()),
             Response::Error { error_type, description } => {
-                Err(format!("Authentication failed: {:?} - {}", error_type, description).into())
+                Err(GreetdError::AuthFailed(
+                    format!("{:?}: {}", error_type, description),
+                ))
             }
-            _ => Err("Unexpected response after password".into()),
+            _ => Err(GreetdError::Protocol("Unexpected response after password".into())),
         }
     }
-    
+
     /// Start a session with the specified command
     pub async fn start_session(&mut self, command: &str) -> GreetdResult<()> {
-        // Parse command into arguments
         let cmd_parts: Vec<String> = command
             .split_whitespace()
             .map(|s| s.to_string())
             .collect();
-        
+
         if cmd_parts.is_empty() {
-            return Err("Empty session command".into());
+            return Err(GreetdError::SessionFailed("Empty session command".into()));
         }
-        
+
         let request = Request::StartSession {
             cmd: cmd_parts,
-            env: vec![], // Environment will be set up by greetd
+            env: vec![],
         };
-        
+
         self.send_request(request).await?;
-        
-        // Session should start, we might not get a response
-        // as greetd might exec into the session
-        Ok(())
+
+        // greetd may exec into the session before responding — that's success.
+        // Try to read a response with a short timeout.
+        match tokio::time::timeout(
+            std::time::Duration::from_millis(500),
+            self.read_response(),
+        ).await {
+            Ok(Ok(Response::Success)) => Ok(()),
+            Ok(Ok(Response::Error { error_type, description })) => {
+                Err(GreetdError::SessionFailed(
+                    format!("{:?}: {}", error_type, description),
+                ))
+            }
+            // Timeout or connection closed = greetd exec'd, which is success
+            Ok(Err(_)) | Err(_) => Ok(()),
+            Ok(Ok(_)) => Err(GreetdError::Protocol("Unexpected response to start_session".into())),
+        }
     }
-    
+
     /// Cancel the current session
     pub async fn cancel_session(&mut self) -> GreetdResult<()> {
         let request = Request::CancelSession;
@@ -108,48 +137,47 @@ impl GreetdClient {
         match self.read_response().await? {
             Response::Success => Ok(()),
             Response::Error { error_type, description } => {
-                Err(format!("Cancel failed: {:?} - {}", error_type, description).into())
+                Err(GreetdError::SessionFailed(
+                    format!("Cancel failed: {:?} - {}", error_type, description),
+                ))
             }
-            _ => Err("Unexpected response to cancel".into()),
+            _ => Err(GreetdError::Protocol("Unexpected response to cancel".into())),
         }
     }
-    
-    /// Send a request to greetd
-    /// The greetd IPC protocol uses length-prefixed JSON messages
+
+    /// Send a request to greetd (length-prefixed JSON)
     async fn send_request(&mut self, request: Request) -> GreetdResult<()> {
-        // Serialize the request to JSON
-        let msg = serde_json::to_vec(&request)?;
-        
-        // Write length prefix (4 bytes, native endian)
+        let msg = serde_json::to_vec(&request)
+            .map_err(|e| GreetdError::Protocol(format!("Serialize error: {}", e)))?;
+
         let len = (msg.len() as u32).to_ne_bytes();
-        self.stream.write_all(&len).await?;
-        
-        // Write the JSON message
-        self.stream.write_all(&msg).await?;
-        self.stream.flush().await?;
-        
+        self.stream.write_all(&len).await
+            .map_err(|e| GreetdError::ConnectionFailed(format!("Write error: {}", e)))?;
+        self.stream.write_all(&msg).await
+            .map_err(|e| GreetdError::ConnectionFailed(format!("Write error: {}", e)))?;
+        self.stream.flush().await
+            .map_err(|e| GreetdError::ConnectionFailed(format!("Flush error: {}", e)))?;
+
         Ok(())
     }
-    
-    /// Read a response from greetd
-    /// The greetd IPC protocol uses length-prefixed JSON messages
+
+    /// Read a response from greetd (length-prefixed JSON)
     async fn read_response(&mut self) -> GreetdResult<Response> {
-        // Read length prefix (4 bytes, native endian)
         let mut len_buf = [0u8; 4];
-        self.stream.read_exact(&mut len_buf).await?;
+        self.stream.read_exact(&mut len_buf).await
+            .map_err(|e| GreetdError::ConnectionFailed(format!("Read error: {}", e)))?;
         let len = u32::from_ne_bytes(len_buf) as usize;
-        
-        // Sanity check to prevent huge allocations
+
         if len > 1024 * 1024 {
-            return Err("Response too large".into());
+            return Err(GreetdError::Protocol("Response too large".into()));
         }
-        
-        // Read the JSON message
+
         let mut msg_buf = vec![0u8; len];
-        self.stream.read_exact(&mut msg_buf).await?;
-        
-        // Deserialize the response
-        let response: Response = serde_json::from_slice(&msg_buf)?;
+        self.stream.read_exact(&mut msg_buf).await
+            .map_err(|e| GreetdError::ConnectionFailed(format!("Read error: {}", e)))?;
+
+        let response: Response = serde_json::from_slice(&msg_buf)
+            .map_err(|e| GreetdError::Protocol(format!("Deserialize error: {}", e)))?;
         Ok(response)
     }
 }
@@ -157,12 +185,7 @@ impl GreetdClient {
 /// Convenience function for full authentication flow
 pub async fn login(username: &str, password: &str, session: &str) -> GreetdResult<()> {
     let mut client = GreetdClient::connect().await?;
-    
-    // Authenticate
     client.authenticate(username, password).await?;
-    
-    // Start session
     client.start_session(session).await?;
-    
     Ok(())
 }

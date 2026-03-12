@@ -1,0 +1,56 @@
+default_user = ""
+disable_autofill = false
+
+# Monitor setup — matches your 3-monitor layout
+[[monitors]]
+name = "HDMI-A-1"
+resolution = "1920x1200@59.95"
+position = "0x0"
+
+[[monitors]]
+name = "DP-2"
+resolution = "2560x1440@170"
+position = "1920x0"
+login = true
+
+[[monitors]]
+name = "DP-1"
+resolution = "1920x1200@59.95"
+position = "4480x0"
+
+[[sessions]]
+name = "Hyprland"
+command = "start-hyprland"
+
+[[sessions]]
+name = "Sway"
+command = "sway"
+
+[[sessions]]
+name = "TTY"
+command = "/bin/bash"
+
+[input]
+kb_layout = "us,ch"
+kb_options = "grp:alt_shift_toggle"
+
+[ui]
+show_clock = true
+clock_format = "%H:%M"
+show_date = true
+date_format = "%A, %d %B %Y"
+title = "hypr-greeter"
+field_width = 50
+field_spacing = 0
+top_spacing = 15
+clock_spacing = 0
+
+[ui.colors]
+background = "#1a1b26"
+foreground = "#c0caf5"
+focused = "#f7768e"
+error = "#f7768e"
+
+[security]
+clear_password_on_error = true
+mask_password = true

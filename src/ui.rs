@@ -1,6 +1,3 @@
-// ~/hypr-greeter/src/ui.rs
-// Terminal UI rendering module
-
 use crate::config::Config;
 use chrono::Local;
 use std::str::FromStr;
@@ -57,7 +54,7 @@ impl App {
             config,
         }
     }
-    
+
     /// Move focus to next field
     pub fn next_focus(&mut self) {
         self.focus = match self.focus {
@@ -66,7 +63,7 @@ impl App {
             Focus::Session => Focus::Username,
         };
     }
-    
+
     /// Move focus to previous field
     pub fn prev_focus(&mut self) {
         self.focus = match self.focus {
@@ -75,31 +72,36 @@ impl App {
             Focus::Session => Focus::Password,
         };
     }
-    
+
     /// Select next session
     pub fn next_session(&mut self) {
-        if self.selected_session < self.config.sessions.len() - 1 {
+        if !self.config.sessions.is_empty()
+            && self.selected_session < self.config.sessions.len() - 1
+        {
             self.selected_session += 1;
         }
     }
-    
+
     /// Select previous session
     pub fn prev_session(&mut self) {
         if self.selected_session > 0 {
             self.selected_session -= 1;
         }
     }
-    
-    /// Get current session command
-    pub fn current_session_command(&self) -> &str {
-        &self.config.sessions[self.selected_session].command
+
+    /// Get current session command, if any sessions are configured
+    pub fn current_session_command(&self) -> Option<&str> {
+        self.config
+            .sessions
+            .get(self.selected_session)
+            .map(|s| s.command.as_str())
     }
-    
+
     /// Clear error message
     pub fn clear_error(&mut self) {
         self.error_message = None;
     }
-    
+
     /// Set error message and optionally clear password
     pub fn set_error(&mut self, message: String) {
         self.error_message = Some(message);
@@ -118,26 +120,21 @@ fn parse_hex_color(hex: &str) -> Color {
 pub fn draw(f: &mut Frame<'_>, app: &App) {
     let size = f.size();
 
-    // Set background color from config color scheme
+    // Set background color from config
     let bg = parse_hex_color(&app.config.ui.colors.background);
     f.render_widget(
         Block::default().style(Style::default().bg(bg)),
         size,
     );
 
-    // Sensible defaults and limits
-    let min_height = 3u16;
-    let max_height = 5u16;
-
-    // Calculate field height as a percentage of terminal size, but clamp to min/max
-    let height = app.config.ui.field_height.map(|v| ((min_height as u32 * v / 100) as u16).clamp(min_height, max_height)).unwrap_or(min_height);
-    let spacing = app.config.ui.field_spacing.unwrap_or(1) as u16;
-    let top_to_clock_spacing = app.config.ui.top_to_clock_spacing.unwrap_or(1) as u16;
-    let clock_to_fields_spacing = app.config.ui.clock_to_fields_spacing.unwrap_or(1) as u16;
+    let height = 3u16; // fixed field height (border + content + border)
+    let spacing = app.config.ui.field_spacing as u16;
+    let top_spacing = app.config.ui.top_spacing as u16;
+    let clock_spacing = app.config.ui.clock_spacing as u16;
     let clock_date_height = if app.config.ui.show_clock && app.config.ui.show_date { 4 } else { 3 };
 
-    // For width: 100 means half the terminal width (main monitor)
-    let width = app.config.ui.field_width.map(|v| ((size.width as u32 * v / 200) as u16).clamp(20, size.width)).unwrap_or(size.width / 2);
+    // Field width as percentage of terminal width
+    let width = ((size.width as u32 * app.config.ui.field_width / 100) as u16).clamp(20, size.width);
 
     // Create main layout
     let chunks = if app.config.ui.show_clock || app.config.ui.show_date {
@@ -145,16 +142,16 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
             .direction(Direction::Vertical)
             .margin(2)
             .constraints([
-                Constraint::Length(3), // Title
-                Constraint::Length(top_to_clock_spacing), // Top to clock
-                Constraint::Length(clock_date_height), // Clock/Date
-                Constraint::Length(clock_to_fields_spacing), // Clock to fields
-                Constraint::Length(height), // Username
-                Constraint::Length(spacing), // Spacing
-                Constraint::Length(height), // Password
-                Constraint::Length(spacing), // Spacing
-                Constraint::Length(height), // Session
-                Constraint::Min(0),    // Error/Space
+                Constraint::Length(3),                  // Title
+                Constraint::Length(top_spacing),        // Top to clock
+                Constraint::Length(clock_date_height),  // Clock/Date
+                Constraint::Length(clock_spacing),      // Clock to fields
+                Constraint::Length(height),             // Username
+                Constraint::Length(spacing),            // Spacing
+                Constraint::Length(height),             // Password
+                Constraint::Length(spacing),            // Spacing
+                Constraint::Length(height),             // Session
+                Constraint::Min(0),                    // Error/Space
             ])
             .split(size)
     } else {
@@ -162,14 +159,14 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
             .direction(Direction::Vertical)
             .margin(2)
             .constraints([
-                Constraint::Length(3), // Title
-                Constraint::Length(top_to_clock_spacing), // Top to fields
-                Constraint::Length(height), // Username
-                Constraint::Length(spacing), // Spacing
-                Constraint::Length(height), // Password
-                Constraint::Length(spacing), // Spacing
-                Constraint::Length(height), // Session
-                Constraint::Min(0),    // Error/Space
+                Constraint::Length(3),                  // Title
+                Constraint::Length(top_spacing),        // Top to fields
+                Constraint::Length(height),             // Username
+                Constraint::Length(spacing),            // Spacing
+                Constraint::Length(height),             // Password
+                Constraint::Length(spacing),            // Spacing
+                Constraint::Length(height),             // Session
+                Constraint::Min(0),                    // Error/Space
             ])
             .split(size)
     };
@@ -177,18 +174,18 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     let mut chunk_idx = 0;
     draw_title(f, chunks[chunk_idx], &app.config);
     chunk_idx += 1;
-    chunk_idx += 1;
+    chunk_idx += 1; // skip top spacing
     if app.config.ui.show_clock || app.config.ui.show_date {
         draw_clock_date(f, chunks[chunk_idx], &app.config);
         chunk_idx += 1;
-        chunk_idx += 1;
+        chunk_idx += 1; // skip clock spacing
     }
     draw_username(f, chunks[chunk_idx], app, width);
     chunk_idx += 1;
-    chunk_idx += 1;
+    chunk_idx += 1; // skip spacing
     draw_password(f, chunks[chunk_idx], app, width);
     chunk_idx += 1;
-    chunk_idx += 1;
+    chunk_idx += 1; // skip spacing
     draw_session(f, chunks[chunk_idx], app, width);
     chunk_idx += 1;
     if let Some(ref error) = app.error_message {
@@ -200,13 +197,12 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
         y: size.height.saturating_sub(1),
         width: size.width,
         height: 1,
-    });
+    }, app);
 }
 
 /// Draw title
 fn draw_title(f: &mut Frame<'_>, area: Rect, config: &Config) {
-    let title_text = config.ui.title.as_deref().unwrap_or("Hypr-Greeter");
-    let title = Paragraph::new(title_text)
+    let title = Paragraph::new(config.ui.title.as_str())
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::NONE));
@@ -217,21 +213,21 @@ fn draw_title(f: &mut Frame<'_>, area: Rect, config: &Config) {
 fn draw_clock_date(f: &mut Frame<'_>, area: Rect, config: &Config) {
     let now = Local::now();
     let mut text = Vec::new();
-    
+
     if config.ui.show_clock {
         let clock = now.format(&config.ui.clock_format).to_string();
         text.push(Line::from(vec![
             Span::styled(clock, Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
         ]));
     }
-    
+
     if config.ui.show_date {
         let date = now.format(&config.ui.date_format).to_string();
         text.push(Line::from(vec![
             Span::styled(date, Style::default().fg(Color::Gray))
         ]));
     }
-    
+
     let paragraph = Paragraph::new(text)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::NONE));
@@ -274,11 +270,15 @@ fn draw_password(f: &mut Frame<'_>, area: Rect, app: &App, width: u16) {
 /// Draw session selector
 fn draw_session(f: &mut Frame<'_>, area: Rect, app: &App, width: u16) {
     let style = get_field_style(app.focus == Focus::Session, &app.config.ui.colors);
-    let session_text = if app.focus == Focus::Session {
+
+    let session_text = if app.config.sessions.is_empty() {
+        "(no sessions)".to_string()
+    } else if app.focus == Focus::Session {
         format!("< {} >", app.config.sessions[app.selected_session].name)
     } else {
         app.config.sessions[app.selected_session].name.clone()
     };
+
     let session = Paragraph::new(session_text)
         .style(style)
         .alignment(Alignment::Center)
@@ -301,12 +301,19 @@ fn draw_error(f: &mut Frame<'_>, area: Rect, error: &str) {
 }
 
 /// Draw help text
-fn draw_help(f: &mut Frame<'_>, area: Rect) {
-    let help_text = "Tab: Next Field | Shift+Tab: Previous Field | ←/→: Change Session | Enter: Login | Esc: Exit";
+fn draw_help(f: &mut Frame<'_>, area: Rect, app: &App) {
+    let mut help_text =
+        "Tab: Next Field | Shift+Tab: Previous Field | \u{2190}/\u{2192}: Change Session | Enter: Login | Esc: Exit"
+            .to_string();
+
+    if let Some(layout_hint) = app.config.layout_switch_hint() {
+        help_text.push_str(" | ");
+        help_text.push_str(layout_hint);
+    }
+
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
-    // Render directly in the provided area (which is already set to the bottom row)
     f.render_widget(help, area);
 }
 
