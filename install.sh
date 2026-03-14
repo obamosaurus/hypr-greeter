@@ -38,6 +38,33 @@ install_pkg() {
     fi
 }
 
+disable_conflicting_display_managers() {
+    local services=(
+        "ly.service"
+        "display-manager.service"
+        "gdm.service"
+        "sddm.service"
+        "lightdm.service"
+        "lxdm.service"
+        "xdm.service"
+    )
+
+    echo "Disabling conflicting display manager services..."
+    for service in "${services[@]}"; do
+        if systemctl list-unit-files "$service" --no-legend 2>/dev/null | grep -q "^$service"; then
+            if systemctl is-enabled "$service" &>/dev/null; then
+                echo "Disabling $service..."
+                systemctl disable "$service"
+            fi
+
+            if systemctl is-active "$service" &>/dev/null; then
+                echo "Stopping $service..."
+                systemctl stop "$service"
+            fi
+        fi
+    done
+}
+
 DEPS=("greetd" "hyprland" "foot" "cargo" "rust")
 for pkg in "${DEPS[@]}"; do
     install_pkg "$pkg"
@@ -141,6 +168,7 @@ chmod 755 /usr/local/bin/hypr-greeter-wrapper
 
 # Enable greetd service
 echo "Enabling greetd service..."
+disable_conflicting_display_managers
 systemctl daemon-reload
 systemctl enable greetd.service
 

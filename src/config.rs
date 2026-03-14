@@ -235,31 +235,6 @@ impl Config {
             .map(|m| m.name.as_str())
     }
 
-    pub fn layout_switch_hint(&self) -> Option<&'static str> {
-        let layout_count = self
-            .input
-            .kb_layout
-            .split(',')
-            .filter(|layout| !layout.trim().is_empty())
-            .count();
-
-        if layout_count < 2 {
-            return None;
-        }
-
-        let options = self.input.kb_options.as_str();
-        if options.contains("grp:alt_shift_toggle") {
-            Some("Alt+Shift: Switch Layout")
-        } else if options.contains("grp:ctrl_shift_toggle") {
-            Some("Ctrl+Shift: Switch Layout")
-        } else if options.contains("grp:win_space_toggle") {
-            Some("Super+Space: Switch Layout")
-        } else if options.contains("grp:caps_toggle") {
-            Some("Caps Lock: Switch Layout")
-        } else {
-            Some("Use configured XKB shortcut to switch layout")
-        }
-    }
 }
 
 /// Get the configuration file path

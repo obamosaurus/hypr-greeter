@@ -1,0 +1,7 @@
+loading actual hyprland after login takes a long time (ca 3s just background visible)
+
+start-hyprland message in login mask (it wants us to use this command but then it doesnt work as expected (skips login mask and logs in as greeter in the temporary hyprland))
+
+UI scaling pretty small
+
+layout should only be configurable via config file, not shortcut in the mask.

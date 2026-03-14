@@ -20,12 +20,14 @@ A customizable TUI greeter for Hyprland and other Wayland compositors, built on 
 ## Architecture
 
 ```
-greetd → hypr-greeter-wrapper (bash) → Hyprland (generated config)
-                                           ├─ foot --app-id=hypr-greeter -e hypr-greeter  (on login monitor)
-                                           └─ solid background color on all monitors
+greetd → hypr-greeter-wrapper (bash) → start-hyprland → Hyprland (generated config)
+                                                              ├─ foot --app-id=hypr-greeter -e hypr-greeter  (on login monitor)
+                                                              └─ solid background color on all monitors
 ```
 
-The wrapper script reads your TOML config, generates a minimal Hyprland config at runtime, and launches Hyprland as the greeter compositor. The TUI greeter runs inside a foot terminal on the designated login monitor.
+The wrapper script reads your TOML config, generates a minimal Hyprland config at runtime, and launches Hyprland as the temporary greeter compositor through `start-hyprland`. The TUI greeter runs inside a foot terminal on the designated login monitor.
+
+`[[sessions]]` only controls the real session started after successful authentication. It does not change how the login mask itself is launched.
 
 ---
 
@@ -46,6 +48,14 @@ cd hypr-greeter
 chmod +x install.sh
 sudo bash install.sh
 sudo systemctl start greetd
+```
+
+If another display manager is already enabled, disable it first. On Arch with `ly`, run:
+
+```bash
+sudo systemctl disable --now ly.service
+sudo systemctl enable greetd.service
+sudo systemctl start greetd.service
 ```
 
 ---
@@ -75,7 +85,7 @@ position = "2560x0"
 
 [[sessions]]
 name = "Hyprland"
-command = "Hyprland"
+command = "start-hyprland"
 
 [[sessions]]
 name = "Sway"

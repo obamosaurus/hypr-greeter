@@ -197,7 +197,7 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
         y: size.height.saturating_sub(1),
         width: size.width,
         height: 1,
-    }, app);
+    });
 }
 
 /// Draw title
@@ -301,15 +301,9 @@ fn draw_error(f: &mut Frame<'_>, area: Rect, error: &str) {
 }
 
 /// Draw help text
-fn draw_help(f: &mut Frame<'_>, area: Rect, app: &App) {
-    let mut help_text =
-        "Tab: Next Field | Shift+Tab: Previous Field | \u{2190}/\u{2192}: Change Session | Enter: Login | Esc: Exit"
-            .to_string();
-
-    if let Some(layout_hint) = app.config.layout_switch_hint() {
-        help_text.push_str(" | ");
-        help_text.push_str(layout_hint);
-    }
+fn draw_help(f: &mut Frame<'_>, area: Rect) {
+    let help_text =
+        "Tab: Next Field | Shift+Tab: Previous Field | \u{2190}/\u{2192}: Change Session | Enter: Login | Esc: Exit";
 
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))

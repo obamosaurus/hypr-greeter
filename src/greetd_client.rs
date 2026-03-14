@@ -112,22 +112,9 @@ impl GreetdClient {
 
         self.send_request(request).await?;
 
-        // greetd may exec into the session before responding — that's success.
-        // Try to read a response with a short timeout.
-        match tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            self.read_response(),
-        ).await {
-            Ok(Ok(Response::Success)) => Ok(()),
-            Ok(Ok(Response::Error { error_type, description })) => {
-                Err(GreetdError::SessionFailed(
-                    format!("{:?}: {}", error_type, description),
-                ))
-            }
-            // Timeout or connection closed = greetd exec'd, which is success
-            Ok(Err(_)) | Err(_) => Ok(()),
-            Ok(Ok(_)) => Err(GreetdError::Protocol("Unexpected response to start_session".into())),
-        }
+        // greetd execs into the session without responding — return immediately.
+        // If it fails, greetd restarts the greeter anyway.
+        Ok(())
     }
 
     /// Cancel the current session

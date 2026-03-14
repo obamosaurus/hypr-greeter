@@ -149,8 +149,8 @@ cat >> "$HYPRLAND_CONF" << 'HYPREOF'
 }
 
 # Launch the greeter TUI in foot terminal
-exec-once = foot --app-id=hypr-greeter -e /usr/local/bin/hypr-greeter
+exec-once = foot --app-id=hypr-greeter -e /usr/local/bin/hypr-greeter; hyprctl dispatch exit
 HYPREOF
 
 # --- Launch Hyprland ---
-exec Hyprland -c "$HYPRLAND_CONF"
+exec start-hyprland -- -c "$HYPRLAND_CONF"
