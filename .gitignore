@@ -1,4 +1,5 @@
 /target/
+config.toml
 
 # Editor settings
 /.idea/
