@@ -101,10 +101,8 @@ async fn run_app<B: ratatui::backend::Backend>(
                                 if let Err(e) = crate::config::save_last_user(&app.username) {
                                     eprintln!("Failed to save last_user: {}", e);
                                 }
-                                // Tell the greeter compositor to exit immediately
-                                let _ = std::process::Command::new("hyprctl")
-                                    .args(["dispatch", "exit"])
-                                    .spawn();
+                                // Let the wrapper shut down the temporary compositor
+                                // after foot exits to avoid racing Hyprland teardown.
                                 break;
                             }
                             Err(e) => {

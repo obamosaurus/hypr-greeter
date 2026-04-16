@@ -3,98 +3,70 @@
 set -euo pipefail
 
 CONFIG_FILE="/etc/hypr-greeter/config.toml"
-TMPDIR="/tmp/hypr-greeter-$$"
+TMPDIR=$(mktemp -d /tmp/hypr-greeter.XXXXXXXXXX)
 
 cleanup() {
     rm -rf "$TMPDIR"
 }
 trap cleanup EXIT
 
-mkdir -p "$TMPDIR"
-
 # --- Parse config using Python3 (guaranteed on Arch) ---
-read_config() {
-    python3 -c "
-import tomllib, json, sys
+# Single Python call writes all extracted values to temp files
+python3 - "$CONFIG_FILE" "$TMPDIR" << 'PYEOF'
+import tomllib, os, sys
+from pathlib import Path
 
-config_path = '$CONFIG_FILE'
+config_path = sys.argv[1]
+out_dir = Path(sys.argv[2])
+
 try:
     with open(config_path, 'rb') as f:
         config = tomllib.load(f)
 except FileNotFoundError:
     config = {}
 
-# Output as JSON for easy bash consumption
-json.dump(config, sys.stdout)
-"
-}
-
-if [ -f "$CONFIG_FILE" ]; then
-    CONFIG_JSON=$(read_config)
-else
-    CONFIG_JSON='{}'
-fi
-
-# Extract background color
-BG_COLOR=$(echo "$CONFIG_JSON" | python3 -c "
-import json, sys
-config = json.load(sys.stdin)
+# --- Background color ---
 colors = config.get('ui', {}).get('colors', {})
 bg = colors.get('background', '#1a1b26')
-# Convert hex to Hyprland rgb format: #RRGGBB -> rgb(RRGGBB)
 if bg.startswith('#'):
     bg = 'rgb(' + bg[1:] + ')'
-print(bg)
-")
+(out_dir / 'bg_color').write_text(bg)
 
-# Extract monitor configs
-MONITOR_LINES=$(echo "$CONFIG_JSON" | python3 -c "
-import json, sys
-config = json.load(sys.stdin)
+# --- Monitor lines ---
 monitors = config.get('monitors', [])
-login_monitor = None
+login_monitor = ''
+monitor_lines = []
 
 if not monitors:
-    # No monitors configured — auto-detect
-    print('monitor=,preferred,auto,1')
+    monitor_lines.append('monitor=,preferred,auto,1')
 else:
     for m in monitors:
         name = m.get('name', '')
         res = m.get('resolution', 'preferred')
         pos = m.get('position', 'auto')
         scale = m.get('scale', 1.0)
-        print(f'monitor={name},{res},{pos},{scale}')
-        if m.get('login', False) and login_monitor is None:
+        monitor_lines.append(f'monitor={name},{res},{pos},{scale}')
+        if m.get('login', False) and not login_monitor:
             login_monitor = name
 
-# Also output the login monitor name on a special line
-if login_monitor:
-    print(f'# LOGIN_MONITOR={login_monitor}')
-")
+(out_dir / 'monitor_lines').write_text('\n'.join(monitor_lines))
+(out_dir / 'login_monitor').write_text(login_monitor)
 
-# Extract keyboard layout settings from config, falling back to XKB_DEFAULT_* env vars
-KEYBOARD_SETTINGS=$(echo "$CONFIG_JSON" | python3 -c "
-import json, os, sys
-
-config = json.load(sys.stdin)
+# --- Keyboard settings ---
 input_cfg = config.get('input', {})
-
-settings = {
-    'kb_layout': input_cfg.get('kb_layout') or os.environ.get('XKB_DEFAULT_LAYOUT', ''),
-    'kb_variant': input_cfg.get('kb_variant') or os.environ.get('XKB_DEFAULT_VARIANT', ''),
-    'kb_options': input_cfg.get('kb_options') or os.environ.get('XKB_DEFAULT_OPTIONS', ''),
-}
-
-for key, value in settings.items():
-    value = value.strip()
+kb_lines = []
+for key in ('kb_layout', 'kb_variant', 'kb_options'):
+    env_key = 'XKB_DEFAULT_' + key.split('_', 1)[1].upper()
+    value = (input_cfg.get(key) or os.environ.get(env_key, '')).strip()
     if value:
-        print(f'    {key} = {value}')
-")
+        kb_lines.append(f'    {key} = {value}')
+(out_dir / 'keyboard_settings').write_text('\n'.join(kb_lines))
+PYEOF
 
-# Extract login monitor name from the special comment
-LOGIN_MONITOR=$(echo "$MONITOR_LINES" | grep '^# LOGIN_MONITOR=' | sed 's/^# LOGIN_MONITOR=//' || true)
-# Filter out the special comment from monitor lines
-MONITOR_LINES=$(echo "$MONITOR_LINES" | grep -v '^# LOGIN_MONITOR=' || true)
+BG_COLOR=$(cat "$TMPDIR/bg_color")
+MONITOR_LINES=$(cat "$TMPDIR/monitor_lines")
+LOGIN_MONITOR=$(cat "$TMPDIR/login_monitor")
+KEYBOARD_SETTINGS=$(cat "$TMPDIR/keyboard_settings")
 
 # --- Generate Hyprland config ---
 HYPRLAND_CONF="$TMPDIR/hyprland.conf"
@@ -127,6 +99,7 @@ decoration {
 
 input {
     follow_mouse = 1
+    numlock_by_default = true
 $KEYBOARD_SETTINGS
 }
 

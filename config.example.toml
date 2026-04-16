@@ -1,8 +1,25 @@
+# hypr-greeter configuration
+# Copy to /etc/hypr-greeter/config.toml (system) or ~/.config/hypr-greeter/config.toml (user).
+# System config takes priority over user config.
+
+# Pre-fill the username field on startup.
+# If empty, falls back to the last logged-in user (stored in /var/lib/greetd/last_user.json).
+# Priority order: default_user > last logged-in user > empty field.
 default_user = ""
+
+# Set to true to always start with an empty username field, ignoring default_user and last_user.
 disable_autofill = false
 
-# Add one [[monitors]] block per display.
-# Set login = true on the monitor where the login form should appear.
+# --- Monitors ---
+# One [[monitors]] block per display.
+# name: output name as reported by your compositor (e.g. from `hyprctl monitors`)
+# resolution: defaults to "preferred" if omitted
+# position: defaults to "auto" if omitted
+# scale: defaults to 1.0 if omitted
+# login: set to true on exactly ONE monitor — the login form will appear there.
+#        If no monitor has login = true, the first listed monitor is used.
+#        If multiple monitors have login = true, the first one wins silently.
+
 [[monitors]]
 name = "HDMI-A-1"
 resolution = "1920x1080@60"
@@ -13,6 +30,16 @@ name = "DP-1"
 resolution = "2560x1440@144"
 position = "1920x0"
 login = true
+
+[[monitors]]
+name = "DP-2"
+resolution = "1920x1080@60"
+position = "4480x0"
+
+# --- Sessions ---
+# Each session appears in the Session selector (navigate with left/right arrow keys when focused).
+# The first session in the list is selected by default.
+# command: passed directly to greetd as the session command on login.
 
 [[sessions]]
 name = "Hyprland"
@@ -26,21 +53,47 @@ command = "sway"
 name = "TTY"
 command = "/bin/bash"
 
+# --- Keyboard input ---
+# These XKB settings are passed to the temporary Hyprland compositor running the greeter.
+# kb_layout: comma-separated layouts, e.g. "us,de" for two layouts
+# kb_variant: comma-separated variants matching each layout position, e.g. ",nodeadkeys"
+# kb_options: e.g. "grp:alt_shift_toggle" to switch layouts, "caps:escape" to remap caps lock
+
 [input]
 kb_layout = "us"
 kb_variant = ""
 kb_options = ""
 
+# --- UI ---
+
 [ui]
+# Text shown at the top of the greeter.
+title = "hypr-greeter"
+
 show_clock = true
+# chrono format string: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 clock_format = "%H:%M"
+
 show_date = true
 date_format = "%A, %d %B %Y"
-title = "hypr-greeter"
+
+# Width of input fields as a percentage of terminal width. Clamped to a minimum of 20 columns.
 field_width = 50
+
+# Blank rows between input fields.
 field_spacing = 0
+
+# Blank rows from the top of the screen to the clock/date block.
 top_spacing = 15
+
+# Blank rows between the clock/date block and the first input field.
 clock_spacing = 0
+
+# --- Colors ---
+# All values are hex color codes.
+# background: terminal background fill
+# foreground: unfocused field text and borders
+# focused:    focused field text and border (also rendered bold)
 
 [ui.colors]
 background = "#1a1b26"
@@ -48,6 +101,12 @@ foreground = "#c0caf5"
 focused = "#f7768e"
 error = "#f7768e"
 
+# --- Security ---
+
 [security]
+# Clear the password field after a failed login attempt.
 clear_password_on_error = true
+
+# Show asterisks instead of typed characters in the password field.
+# Set to false to show the password in plain text.
 mask_password = true

@@ -1,18 +1,19 @@
 # Hypr-Greeter
 
-A customizable TUI greeter for Hyprland and other Wayland compositors, built on [greetd](https://github.com/kennylevinsen/greetd).
+A TUI greeter for Hyprland, built on [greetd](https://github.com/kennylevinsen/greetd).
+
+> **Warning:** This project is experimental. Installation modifies system services, disables other display managers, and creates system users. A misconfiguration can leave you without a working login manager. Use at your own risk and make sure you know how to recover from a TTY.
 
 ---
 
 ## Features
 
-- **Multi-monitor support** — login mask on one monitor, solid background on others (via Hyprland)
-- TUI interface (ratatui + foot terminal)
-- Session selection (Hyprland, Sway, TTY, custom)
-- Remembers last username
+- Multi-monitor support — login form on one monitor, solid background on the rest
+- Session selector (Hyprland, Sway, TTY, or custom)
+- Remembers last logged-in username
 - Clock and date display
-- Configurable UI and security options
-- Secure password handling (no echo, optional masking)
+- Configurable keyboard layouts
+- Secure password handling (masked input, clear on error)
 - Simple TOML configuration
 
 ---
@@ -20,23 +21,23 @@ A customizable TUI greeter for Hyprland and other Wayland compositors, built on 
 ## Architecture
 
 ```
-greetd → hypr-greeter-wrapper (bash) → start-hyprland → Hyprland (generated config)
-                                                              ├─ foot --app-id=hypr-greeter -e hypr-greeter  (on login monitor)
-                                                              └─ solid background color on all monitors
+greetd → hypr-greeter-wrapper.sh → start-hyprland → Hyprland (generated config)
+                                                          ├─ foot -e hypr-greeter  (login monitor)
+                                                          └─ solid background      (all other monitors)
 ```
 
-The wrapper script reads your TOML config, generates a minimal Hyprland config at runtime, and launches Hyprland as the temporary greeter compositor through `start-hyprland`. The TUI greeter runs inside a foot terminal on the designated login monitor.
+The wrapper script reads your TOML config, generates a minimal Hyprland config at runtime, and launches Hyprland as the greeter compositor via `start-hyprland`. The TUI runs inside a foot terminal on the designated login monitor.
 
-`[[sessions]]` only controls the real session started after successful authentication. It does not change how the login mask itself is launched.
+`[[sessions]]` controls the session started after authentication — it does not affect how the greeter itself is launched.
 
 ---
 
 ## Dependencies
 
-- **greetd** — display manager daemon
-- **hyprland** — compositor for multi-monitor support
-- **foot** — terminal emulator for the TUI
-- **rust/cargo** — for building from source
+- [greetd](https://github.com/kennylevinsen/greetd) — display manager daemon
+- [Hyprland](https://github.com/hyprwm/Hyprland) — Wayland compositor
+- [foot](https://codeberg.org/dnkl/foot) — terminal emulator
+- [Rust](https://www.rust-lang.org/) — build dependency
 
 ---
 
@@ -45,24 +46,29 @@ The wrapper script reads your TOML config, generates a minimal Hyprland config a
 ```bash
 git clone https://github.com/obamosaurus/hypr-greeter
 cd hypr-greeter
-chmod +x install.sh
+cp config.example.toml config.toml   # edit to taste
 sudo bash install.sh
 sudo systemctl start greetd
 ```
 
-If another display manager is already enabled, disable it first. On Arch with `ly`, run:
-
-```bash
-sudo systemctl disable --now ly.service
-sudo systemctl enable greetd.service
-sudo systemctl start greetd.service
-```
+The install script will:
+- Install missing dependencies via pacman (with AUR fallback via yay)
+- Build the greeter with `cargo build --release`
+- Install binaries to `/usr/local/bin/`
+- Copy `config.toml` to `/etc/hypr-greeter/config.toml` (if not already present)
+- Create the `greeter` and `greetd` system users
+- Configure and enable `greetd.service`
+- Disable any conflicting display managers (ly, gdm, sddm, lightdm, etc.)
 
 ---
 
 ## Configuration
 
-Configuration is stored in `/etc/hypr-greeter/config.toml`.
+The greeter looks for config in this order:
+1. `/etc/hypr-greeter/config.toml` (system — installed by the install script)
+2. `~/.config/hypr-greeter/config.toml` (user fallback)
+
+See [config.example.toml](config.example.toml) for all available options with comments.
 
 ### Full example
 
@@ -70,19 +76,20 @@ Configuration is stored in `/etc/hypr-greeter/config.toml`.
 default_user = ""
 disable_autofill = false
 
-# Monitor setup (optional — omit entire section for auto-detect)
-# Run `hyprctl monitors` from your session to find monitor names
+# Monitor setup (optional — omit for auto-detect)
+# Run `hyprctl monitors` from your session to find monitor names.
 [[monitors]]
 name = "DP-1"
 resolution = "2560x1440@144"
 position = "0x0"
-login = true        # show login mask on this monitor
+login = true        # show login form on this monitor
 
 [[monitors]]
 name = "HDMI-A-1"
 resolution = "1920x1080@60"
 position = "2560x0"
 
+# Sessions available in the selector
 [[sessions]]
 name = "Hyprland"
 command = "start-hyprland"
@@ -95,12 +102,18 @@ command = "sway"
 name = "TTY"
 command = "/bin/bash"
 
+# Keyboard layout passed to Hyprland
+[input]
+kb_layout = "us"
+kb_variant = ""
+kb_options = ""
+
 [ui]
+title = "hypr-greeter"
 show_clock = true
 clock_format = "%H:%M"
 show_date = true
 date_format = "%A, %d %B %Y"
-title = "hypr-greeter"
 field_width = 50        # percentage of terminal width
 field_spacing = 0       # rows between fields
 top_spacing = 15        # rows from top to clock
@@ -117,79 +130,26 @@ clear_password_on_error = true
 mask_password = true
 ```
 
-### Monitor examples
+### Monitors
 
-**Auto-detect (no config needed):**
-Omit the `[[monitors]]` section entirely. Hyprland will auto-detect all connected monitors.
+Omit the `[[monitors]]` section entirely to let Hyprland auto-detect all connected displays. Only add monitor blocks if you need to set resolution, position, scale, or pin the login form to a specific output.
 
-**Single monitor:**
-```toml
-[[monitors]]
-name = "DP-1"
-resolution = "1920x1080@60"
-position = "0x0"
-login = true
-```
+Set `login = true` on exactly one monitor to place the login form there. If omitted, the first listed monitor is used.
 
-**Dual monitor:**
-```toml
-[[monitors]]
-name = "DP-1"
-resolution = "2560x1440@144"
-position = "0x0"
-login = true
+Run `hyprctl monitors` from your Hyprland session to find monitor names.
 
-[[monitors]]
-name = "HDMI-A-1"
-resolution = "1920x1080@60"
-position = "2560x0"
-```
-
-**Triple monitor:**
-```toml
-[[monitors]]
-name = "DP-1"
-resolution = "1920x1080@60"
-position = "0x0"
-
-[[monitors]]
-name = "DP-2"
-resolution = "2560x1440@144"
-position = "1920x0"
-login = true
-
-[[monitors]]
-name = "HDMI-A-1"
-resolution = "1920x1080@60"
-position = "4480x0"
-```
-
-Run `hyprctl monitors` from your Hyprland session to find your monitor names.
-
----
-
-## Keyboard Layout Configuration
-
-Set keyboard layouts in `/etc/hypr-greeter/config.toml`:
+### Keyboard layouts
 
 ```toml
 [input]
-kb_layout = "us,ch"
+kb_layout = "us,de"
+kb_variant = ",nodeadkeys"
 kb_options = "grp:alt_shift_toggle"
 ```
 
-`ch` is the default Swiss German layout. With the example above, the login screen starts with `us` available and lets you switch to Swiss German using `Alt+Shift`.
+These are standard XKB settings passed directly to Hyprland. Use comma-separated values for multiple layouts and `kb_options` to set a toggle key.
 
-If you need a specific Swiss variant, add `kb_variant`. For example:
-
-```toml
-[input]
-kb_layout = "us,ch"
-kb_variant = ",de_nodeadkeys"
-kb_options = "grp:alt_shift_toggle"
-```
-
-The wrapper still accepts `XKB_DEFAULT_LAYOUT`, `XKB_DEFAULT_VARIANT`, and `XKB_DEFAULT_OPTIONS` from `/etc/greetd/config.toml`, but the greeter config is now the preferred place to manage this.
+The wrapper also respects `XKB_DEFAULT_LAYOUT`, `XKB_DEFAULT_VARIANT`, and `XKB_DEFAULT_OPTIONS` environment variables as fallbacks, but the config file is the preferred way to set this.
 
 ---
 
@@ -202,22 +162,26 @@ The wrapper still accepts `XKB_DEFAULT_LAYOUT`, `XKB_DEFAULT_VARIANT`, and `XKB_
 ## Uninstallation
 
 ```bash
-chmod +x uninstall.sh
-sudo ./uninstall.sh
+sudo bash uninstall.sh
 ```
+
+The script will prompt before removing config files, greetd state, and the greeter user.
 
 ---
 
 ## Development
 
-- **Build:** `cargo build` or `cargo build --release`
-- **Test wrapper:** `bash -x hypr-greeter-wrapper.sh` (inspect generated Hyprland config)
+```bash
+cargo build              # debug build
+cargo build --release    # release build
+bash -x hypr-greeter-wrapper.sh   # inspect generated Hyprland config
+```
 
 ---
 
 ## License
 
-MIT License
+MIT
 
 ---
 
@@ -227,9 +191,3 @@ MIT License
 - [Hyprland](https://github.com/hyprwm/Hyprland)
 - [foot](https://codeberg.org/dnkl/foot)
 - [ratatui](https://github.com/ratatui-org/ratatui)
-
----
-
-## Support
-
-Open an issue or pull request on GitHub.

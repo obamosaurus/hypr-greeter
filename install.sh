@@ -153,7 +153,6 @@ mkdir -p /etc/systemd/system/greetd.service.d
 
 cat > /etc/systemd/system/greetd.service.d/override.conf << 'EOF'
 [Service]
-After=systemd-user-sessions.service plymouth-quit-wait.service
 Environment="XDG_SESSION_TYPE=wayland"
 TimeoutStartSec=30s
 Restart=always
