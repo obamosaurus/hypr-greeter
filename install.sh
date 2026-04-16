@@ -85,7 +85,6 @@ cargo build --release
 # Install binaries
 echo "Installing binaries..."
 install -Dm755 "$SCRIPT_DIR/target/release/hypr-greeter" /usr/local/bin/hypr-greeter
-install -Dm755 "$SCRIPT_DIR/hypr-greeter-wrapper.sh" /usr/local/bin/hypr-greeter-wrapper
 
 # Create config directory and install default config
 echo "Setting up configuration..."
@@ -144,7 +143,7 @@ cat > /etc/greetd/config.toml << 'EOF'
 vt = 1
 
 [default_session]
-command = "/usr/local/bin/hypr-greeter-wrapper"
+command = "/usr/local/bin/hypr-greeter --bootstrap"
 user = "greeter"
 EOF
 
@@ -163,7 +162,6 @@ EOF
 # Set permissions
 chmod 644 /etc/greetd/config.toml
 chmod 755 /usr/local/bin/hypr-greeter
-chmod 755 /usr/local/bin/hypr-greeter-wrapper
 
 # Enable greetd service
 echo "Enabling greetd service..."

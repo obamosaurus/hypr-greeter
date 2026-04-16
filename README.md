@@ -21,12 +21,12 @@ A TUI greeter for Hyprland, built on [greetd](https://github.com/kennylevinsen/g
 ## Architecture
 
 ```
-greetd → hypr-greeter-wrapper.sh → start-hyprland → Hyprland (generated config)
-                                                          ├─ foot -e hypr-greeter  (login monitor)
-                                                          └─ solid background      (all other monitors)
+greetd → hypr-greeter --bootstrap → start-hyprland → Hyprland (generated config)
+                                                           ├─ foot -e hypr-greeter  (login monitor)
+                                                           └─ solid background      (all other monitors)
 ```
 
-The wrapper script reads your TOML config, generates a minimal Hyprland config at runtime, and launches Hyprland as the greeter compositor via `start-hyprland`. The TUI runs inside a foot terminal on the designated login monitor.
+In bootstrap mode (`--bootstrap`) the binary reads your TOML config, generates a minimal Hyprland config at runtime, and execs `start-hyprland` to launch Hyprland as the greeter compositor. The TUI runs inside a foot terminal on the designated login monitor.
 
 `[[sessions]]` controls the session started after authentication — it does not affect how the greeter itself is launched.
 
@@ -149,7 +149,7 @@ kb_options = "grp:alt_shift_toggle"
 
 These are standard XKB settings passed directly to Hyprland. Use comma-separated values for multiple layouts and `kb_options` to set a toggle key.
 
-The wrapper also respects `XKB_DEFAULT_LAYOUT`, `XKB_DEFAULT_VARIANT`, and `XKB_DEFAULT_OPTIONS` environment variables as fallbacks, but the config file is the preferred way to set this.
+`hypr-greeter` also respects `XKB_DEFAULT_LAYOUT`, `XKB_DEFAULT_VARIANT`, and `XKB_DEFAULT_OPTIONS` environment variables as fallbacks, but the config file is the preferred way to set this.
 
 ---
 
@@ -172,9 +172,10 @@ The script will prompt before removing config files, greetd state, and the greet
 ## Development
 
 ```bash
-cargo build              # debug build
-cargo build --release    # release build
-bash -x hypr-greeter-wrapper.sh   # inspect generated Hyprland config
+cargo build                                 # debug build
+cargo build --release                       # release build
+./target/release/hypr-greeter --bootstrap --dry-run \
+    --config ./config.toml                  # inspect generated Hyprland config
 ```
 
 ---

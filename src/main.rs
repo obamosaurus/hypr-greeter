@@ -1,3 +1,4 @@
+mod bootstrap;
 mod config;
 mod greetd_client;
 mod ui;
@@ -17,6 +18,19 @@ use std::io;
 use ui::{App, Focus};
 
 fn main() -> Result<(), Box<dyn Error>> {
+    if std::env::args().nth(1).as_deref() == Some("--bootstrap") {
+        let rest: Vec<String> = std::env::args().skip(2).collect();
+        let parsed = match bootstrap::parse_args(&rest) {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("hypr-greeter: {}", e);
+                std::process::exit(2);
+            }
+        };
+        bootstrap::run(&parsed);
+        return Ok(());
+    }
+
     // Install panic hook to restore terminal on panic
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -101,8 +115,6 @@ async fn run_app<B: ratatui::backend::Backend>(
                                 if let Err(e) = crate::config::save_last_user(&app.username) {
                                     eprintln!("Failed to save last_user: {}", e);
                                 }
-                                // Let the wrapper shut down the temporary compositor
-                                // after foot exits to avoid racing Hyprland teardown.
                                 break;
                             }
                             Err(e) => {

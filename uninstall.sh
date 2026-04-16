@@ -18,6 +18,8 @@ systemctl disable greetd.service 2>/dev/null || true
 # Remove binaries
 echo "Removing binaries..."
 rm -f /usr/local/bin/hypr-greeter
+# Legacy: older versions installed a shell wrapper at this path. Keep the rm
+# so upgraders don't leave it behind.
 rm -f /usr/local/bin/hypr-greeter-wrapper
 
 # Ask about config removal

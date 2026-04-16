@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Main configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,19 +224,6 @@ impl Default for SecurityConfig {
     }
 }
 
-impl Config {
-    /// Get the name of the monitor designated for login, if any
-    #[allow(dead_code)]
-    pub fn login_monitor_name(&self) -> Option<&str> {
-        self.monitors
-            .iter()
-            .find(|m| m.login)
-            .or(self.monitors.first())
-            .map(|m| m.name.as_str())
-    }
-
-}
-
 /// Get the configuration file path
 pub fn config_path() -> PathBuf {
     // Try system config first
@@ -247,29 +234,32 @@ pub fn config_path() -> PathBuf {
 
     // Fall back to user config
     dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("~/.config"))
+        .unwrap_or_default()
         .join("hypr-greeter")
         .join("config.toml")
 }
 
-/// Load configuration from disk
+/// Load configuration from disk using the default search path.
 pub fn load_config() -> Result<Config, Box<dyn Error>> {
-    let path = config_path();
-    let mut config: Config = if path.exists() {
-        let content = std::fs::read_to_string(&path)?;
-        toml::from_str(&content)?
-    } else {
-        Config::default()
+    load_config_from(None)
+}
+
+/// Load configuration from an explicit path, or fall back to the default search path.
+pub fn load_config_from(path: Option<&Path>) -> Result<Config, Box<dyn Error>> {
+    let cfg_path = match path {
+        Some(p) => p.to_path_buf(),
+        None => config_path(),
+    };
+    let mut config: Config = match std::fs::read_to_string(&cfg_path) {
+        Ok(content) => toml::from_str(&content)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Config::default(),
+        Err(e) => return Err(e.into()),
     };
 
-    // Load last_user from state file for fallback autofill
-    let user_file = PathBuf::from("/var/lib/greetd/last_user.json");
-    if user_file.exists() {
-        if let Ok(content) = std::fs::read_to_string(&user_file) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(last_user) = json.get("last_user").and_then(|v| v.as_str()) {
-                    config.last_user = Some(last_user.to_string());
-                }
+    if let Ok(content) = std::fs::read_to_string("/var/lib/greetd/last_user.json") {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(last_user) = json.get("last_user").and_then(|v| v.as_str()) {
+                config.last_user = Some(last_user.to_string());
             }
         }
     }
