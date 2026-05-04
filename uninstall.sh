@@ -10,6 +10,18 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+echo ""
+echo "WARNING: if you are currently inside a session started by greetd, stopping"
+echo "the service will terminate your session and drop you back to a TTY."
+echo "Any unsaved work in open applications will be lost."
+echo ""
+read -p "Continue? [y/N] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
 # Stop greetd service
 echo "Stopping greetd service..."
 systemctl stop greetd.service 2>/dev/null || true
